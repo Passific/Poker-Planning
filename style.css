@@ -52,6 +52,20 @@
   height: 46px;
 }
 
+.poker-control-group {
+  margin-bottom: 15px;
+}
+
+#home-btn, #home {
+  display: inline-block;
+}
+
+#home-btn a {
+  font-size: 50px;
+  text-decoration: none;
+  color: darkgray;
+}
+
 #table-select {
   margin-top: 8px;
 }

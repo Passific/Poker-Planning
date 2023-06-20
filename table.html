@@ -8,94 +8,21 @@
     <link rel="stylesheet" href="style.css" type="text/css"/>
 </head>
 <body>
-<div id="poker-select">
-    <div class="poker-card poker-card-select" id="card-1" data-id="1" data-value="0">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/0.svg" alt="0"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
+<div class="poker-control-group">
+    <div id="home-btn"><a href="index.html">&#8962;</a></div>
+    <div id="home">
+        <div>Hello <span id="name">???</span></div>
+        <div id="poker-control">
+            <button id="reset">Reset</button>
+            <button id="reveal">Reveal</button>
+            <span id="countdown"></span>
+            <span>Suite: <select id="select-suite"></select></span>
         </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-2" data-id="2" data-value="1">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/1.svg" alt="1"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
+        <div>
         </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-3" data-id="3" data-value="2">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/2.svg" alt="2"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-4" data-id="4" data-value="3">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/3.svg" alt="3"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-5" data-id="5" data-value="5">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/5.svg" alt="5"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-6" data-id="6" data-value="8">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/8.svg" alt="8"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-7" data-id="7" data-value="13">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/13.svg" alt="13"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-8" data-id="8" data-value="20">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/20.svg" alt="20"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-9" data-id="9" data-value="40">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/40.svg" alt="40"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-10" data-id="10" data-value="100">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/100.svg" alt="100"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card-spacer"></div>
-    <div class="poker-card poker-card-select" id="card-11" data-id="11" data-value="coffee">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/coffee.svg" alt="Coffee"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-12" data-id="12" data-value="infinite">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/infinite.svg" alt="Infinite"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <div class="poker-card poker-card-select" id="card-13" data-id="13" data-value="question">
-        <div class="poker-card-inner">
-            <div class="poker-card-front"><img src="cards/question.svg" alt="?"></div>
-            <div class="poker-card-back"><img src="cards/back.svg" alt="PP"></div>
-        </div>
-    </div>
-    <br>
-    <div>Hello <span id="name">???</span></div>
-    <div id="poker-control">
-        <button id="reset">Reset</button>
-        <button id="reveal">Reveal</button>
-        <span id="countdown"></span>
     </div>
 </div>
+<div id="poker-select"></div>
 <div id="poker-right-panel">
     <fieldset id="poker-result"><legend>Results</legend></fieldset>
     <div id="poker-review"></div>

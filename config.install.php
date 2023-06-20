@@ -17,7 +17,7 @@ try
 	// Create the data base for tables
 	$Table=$site_bdd_prefix."tables";
 	echo "Creating table: '$Table'...<br>";
-	$bdd->query("CREATE TABLE IF NOT EXISTS `".$site_bdd_name."`.".$Table." (`id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, `status` INT(11), `date` DATETIME, `timeout` INT(11) NOT NULL DEFAULT '60') ENGINE = MYISAM;");
+	$bdd->query("CREATE TABLE IF NOT EXISTS `".$site_bdd_name."`.".$Table." (`id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, `status` INT(11), `date` DATETIME, `timeout` INT(11) NOT NULL DEFAULT '60', `suite` VARCHAR(30), `theme` VARCHAR(30)) ENGINE = MYISAM;");
 
 	// Create the data base for cards
 	$Table=$site_bdd_prefix."cards";

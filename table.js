@@ -12,11 +12,21 @@ const THRESHOLD_OUT_FOCUS   = 3;
 const THRESHOLD_NOT_VISIBLE = 30;
 const DEFAULT_TIMEOUT       = 60;
 
+const SPACER_CARD = "!spacer!";
+const CARD_SUITES = {
+    "fibonacci2" : [0, 1, 2, 3, 5, 8, 13, 20, 40, 100, SPACER_CARD, "coffee", "infinite", "question"],
+    "confidence" : [1, 2, 3, 4, 5]
+}
+const DEFAULT_SUITE = "fibonacci2"; // "fibonacci2" or "confidence"
+
 let state     = "name";
+let theme     = "basic";
+let theme_ext = "svg";
 let counter   = 10;
 let inFocus   = true;
 let threshold = 1;
 const select = document.getElementById("poker-select");
+const selectSuite = document.getElementById("select-suite");
 const review = document.getElementById("poker-review");
 const result = document.getElementById("poker-result");
 const reset  = document.getElementById("reset");
@@ -207,6 +217,11 @@ function ask_reveal ()
     return api_fetch("reveal&t="+tableId);
 }
 
+function ask_change_suite ()
+{
+    return api_fetch("suite&p="+selectSuite.value+"&t="+tableId);
+}
+
 function update_table ()
 {
     if (counter >= threshold) {
@@ -267,6 +282,10 @@ function update_table ()
                     timeout = Number.parseInt(get.timeout, 10);
                 }
                 document.querySelectorAll(".timeout").forEach((el) => { el.checked = ("timeout-"+timeout == el.id); });
+            }
+            if ("" != get.suite && suiteName !== get.suite) {
+                suiteName = get.suite;
+                set_table();
             }
 
             switch (get.status) {
@@ -335,23 +354,79 @@ function set_apiSource ()
     });
 }
 
-select.querySelectorAll(".poker-card").forEach((el) => { el.addEventListener("click", do_select_card); el.classList.add("poker-card-flip"); });
-reset.disabled = true;
-reveal.disabled = true;
-reset.addEventListener("click", ask_reset);
-reveal.addEventListener("click", ask_reveal);
+function set_table()
+{
+    let count = 1;
+    if (undefined === CARD_SUITES[suiteName]) {
+        suiteName = DEFAULT_SUITE;
+    }
+    select.innerHTML = "";
+    for (const Nb in CARD_SUITES[suiteName]) {
+        const cardNb = CARD_SUITES[suiteName][Nb];
+        if (SPACER_CARD != cardNb) {
+            const card_back = document.createElement("div");
+            card_back.classList.add("poker-card-back");
+            const back_img = document.createElement("img");
+            back_img.setAttribute("src", "cards/"+theme+"/back."+theme_ext);
+            back_img.setAttribute("alt", "PP");
+            card_back.appendChild(back_img);
+            const card_inner = document.createElement("div");
+            card_inner.classList.add("poker-card-inner");
+            const card_front = document.createElement("div");
+            card_front.classList.add("poker-card-front");
+            const card_front_img = document.createElement("img");
+            card_front_img.setAttribute("src", "cards/"+theme+"/"+cardNb+"."+theme_ext);
+            card_front.appendChild(card_front_img);
+            card_front.setAttribute("alt", cardNb);
+            card_inner.appendChild(card_front);
+            card_inner.appendChild(card_back);
+            const card = document.createElement("div");
+            card.classList.add("poker-card", "poker-card-select", "poker-card-flip");
+            card.setAttribute("id", "card-"+count);//.setAttribute("data-id", count).setAttribute("data-value", cardNb);
+            card.dataset.id = count; card.dataset.value = cardNb;
+            card.addEventListener("click", do_select_card);
+            card.appendChild(card_inner);
+            select.appendChild(card);
+            count++;
+        }
+        else {
+            let spacer = document.createElement("div");
+            spacer.classList.add("poker-card-spacer");
+            select.appendChild(spacer);
+        }
+    }
+    selectSuite.innerHTML = "";
+    for (const Suite in CARD_SUITES) {
+        const optionEl = document.createElement("option");
+        optionEl.textContent = Suite;
+        if (suiteName === Suite) {
+            optionEl.setAttribute("selected", "true");
+        }
+        selectSuite.appendChild(optionEl);
+    }
+    select.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
+}
 
 const userName = JSON.parse(localStorage.getItem("userName"));
 const tableId = getParameterByName("table");
+let suiteName = DEFAULT_SUITE;
 
 if (null !== userName
         && null !== tableId /* parameter found */
         && "" !== tableId /* parameter has value */
         && (+tableId === +tableId) /* check if it's a number */
         ) {
+    reset.disabled = true;
+    reveal.disabled = true;
+    reset.addEventListener("click", ask_reset);
+    reveal.addEventListener("click", ask_reveal);
+    selectSuite.addEventListener("change", ask_change_suite);
+
     nameEl.textContent = userName;
+    suiteName = getParameterByName("suite");
+    set_table();
+
     state = "select";
-    select.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
     set_apiSource();
 }
 else {
