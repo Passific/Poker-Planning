@@ -272,6 +272,24 @@ function update_table ()
                 }
             });
 
+            if ("" !== get.theme) {
+                let hasChanged = false;
+                let tmp_theme = "";
+                let tmp_theme_ext = "";
+                [ tmp_theme, tmp_theme_ext ] = get.theme.split(";");
+                if ((undefined !== tmp_theme) && ("" !== tmp_theme) && (theme !== tmp_theme)) {
+                    theme = tmp_theme;
+                    hasChanged = true;
+                }
+                if ((undefined !== tmp_theme_ext) && ("" !== tmp_theme_ext) && (theme_ext !== tmp_theme_ext)) {
+                    theme_ext = tmp_theme_ext;
+                    hasChanged = true;
+                }
+                if (hasChanged) {
+                    set_table();
+                }
+            }
+
             if ("0000-00-00 00:00:00" != get.date) {
                 if (timerCountdown == null) {
                     const timetoms = new Date(get.date) - Date.now();
@@ -435,7 +453,6 @@ if (null !== userName
 
     nameEl.textContent = userName;
     suiteName = getParameterByName("suite");
-    set_table();
 
     state = "select";
     set_apiSource();
