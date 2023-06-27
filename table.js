@@ -20,8 +20,8 @@ const CARD_SUITES = {
 const DEFAULT_SUITE = "fibonacci2"; // "fibonacci2" or "confidence"
 
 let state     = "name";
-let theme     = "basic";
-let theme_ext = "svg";
+let theme     = "custom";
+let theme_ext = "png";
 let counter   = 10;
 let inFocus   = true;
 let threshold = 1;
@@ -31,6 +31,7 @@ const review = document.getElementById("poker-review");
 const result = document.getElementById("poker-result");
 const reset  = document.getElementById("reset");
 const reveal = document.getElementById("reveal");
+const anonymousEl = document.getElementById("anonymous");
 const nameEl = document.getElementById("name");
 const countdownEl  = document.getElementById("countdown");
 let timerCountdown = null;
@@ -222,6 +223,11 @@ function ask_change_suite ()
     return api_fetch("suite&p="+selectSuite.value+"&t="+tableId);
 }
 
+function ask_anonymous ()
+{
+    return api_fetch("anonymous&v="+(anonymousEl.checked?1:0)+"&t="+tableId);
+}
+
 function update_table ()
 {
     if (counter >= threshold) {
@@ -233,6 +239,8 @@ function update_table ()
                 }
             }
             let isPokerStarted = false;
+            const isAnonyous = get.anonymous;
+            anonymousEl.checked = isAnonyous;
             review.innerHTML= "";
             const newTableStatus = get.status;
             get.data.forEach((val) => {
@@ -252,10 +260,12 @@ function update_table ()
                         else {
                             card.classList.remove("poker-card-flip");
                         }
-                        const newLabel = document.createElement("span");
-                        newLabel.classList.add("owner");
-                        newLabel.textContent = val.owner;
-                        card.appendChild(newLabel);
+                        if (! isAnonyous) {
+                            const newLabel = document.createElement("span");
+                            newLabel.classList.add("owner");
+                            newLabel.textContent = val.owner;
+                            card.appendChild(newLabel);
+                        }
                         review.appendChild(card);
                         isPokerStarted = true;
                     }
@@ -382,7 +392,7 @@ function set_table()
             card_inner.appendChild(card_back);
             const card = document.createElement("div");
             card.classList.add("poker-card", "poker-card-select", "poker-card-flip");
-            card.setAttribute("id", "card-"+count);//.setAttribute("data-id", count).setAttribute("data-value", cardNb);
+            card.setAttribute("id", "card-"+count);
             card.dataset.id = count; card.dataset.value = cardNb;
             card.addEventListener("click", do_select_card);
             card.appendChild(card_inner);
@@ -421,6 +431,7 @@ if (null !== userName
     reset.addEventListener("click", ask_reset);
     reveal.addEventListener("click", ask_reveal);
     selectSuite.addEventListener("change", ask_change_suite);
+    anonymousEl.addEventListener("change", ask_anonymous);
 
     nameEl.textContent = userName;
     suiteName = getParameterByName("suite");

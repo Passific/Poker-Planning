@@ -63,10 +63,20 @@ function api($action, $param, $value, $table)
         echo json_encode( array("result"=>$result, "data" => "") );
         break;
     case "suite":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `suite`='".$param."', `date`='0000-00-00 00:00:00' WHERE `id`='".$table."'") ) {
+        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `suite`='".$param."' WHERE `id`='".$table."'") ) {
             $result = api("reset", $param, $value, $table);
         }
-        echo json_encode( array("result"=>$result, "data" => "") );
+        else {
+            echo json_encode( array("result"=>$result, "data" => "") );
+        }
+        break;
+    case "anonymous":
+        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `anonymous`='".$value."' WHERE `id`='".$table."'") ) {
+            $result = api("reset", $param, $value, $table);
+        }
+        else {
+            echo json_encode( array("result"=>$result, "data" => "") );
+        }
         break;
     case "get":
         $data = array();
@@ -83,9 +93,10 @@ function api($action, $param, $value, $table)
             $tableTimeout = $donnees2['timeout'];
             $tableSuite = $donnees2['suite'];
             $tableTheme = $donnees2['theme'];
+            $tableAnon = ("1" == $donnees2['anonymous']);
             $result = true;
         }$reponse->closeCursor();
-        echo json_encode( array("result"=>$result, "data" => $data, "status" => $tableStatus, "date" => $tableDate, "timeout" => $tableTimeout, "suite" => $tableSuite, "theme" => $tableTheme ));
+        echo json_encode( array("result"=>$result, "data" => $data, "status" => $tableStatus, "date" => $tableDate, "timeout" => $tableTimeout, "suite" => $tableSuite, "theme" => $tableTheme, "anonymous" => $tableAnon ));
         break;
     case "select":
         if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `status`='0', `date`=IF(`date`='0000-00-00 00:00:00', NOW(), `date`) WHERE `id`='".$table."'") ) {
