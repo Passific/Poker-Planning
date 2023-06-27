@@ -20,8 +20,8 @@ const CARD_SUITES = {
 const DEFAULT_SUITE = "fibonacci2"; // "fibonacci2" or "confidence"
 
 let state     = "name";
-let theme     = "custom";
-let theme_ext = "png";
+let theme     = "basic";
+let theme_ext = "svg";
 let counter   = 10;
 let inFocus   = true;
 let threshold = 1;
@@ -243,6 +243,29 @@ function update_table ()
             anonymousEl.checked = isAnonyous;
             review.innerHTML= "";
             const newTableStatus = get.status;
+            let hasTableChanged = false;
+
+            if ("" !== get.theme) {
+                let tmp_theme = "";
+                let tmp_theme_ext = "";
+                [ tmp_theme, tmp_theme_ext ] = get.theme.split(";");
+                if ((undefined !== tmp_theme) && ("" !== tmp_theme) && (theme !== tmp_theme)) {
+                    theme = tmp_theme;
+                    hasTableChanged = true;
+                }
+                if ((undefined !== tmp_theme_ext) && ("" !== tmp_theme_ext) && (theme_ext !== tmp_theme_ext)) {
+                    theme_ext = tmp_theme_ext;
+                    hasTableChanged = true;
+                }
+            }
+            if ("" != get.suite && suiteName !== get.suite) {
+                suiteName = get.suite;
+                hasTableChanged = true;
+            }
+            if (hasTableChanged) {
+                set_table();
+            }
+
             get.data.forEach((val) => {
                 if (val.value) {
                     const el = document.getElementById("card-"+val.value);
@@ -272,24 +295,6 @@ function update_table ()
                 }
             });
 
-            if ("" !== get.theme) {
-                let hasChanged = false;
-                let tmp_theme = "";
-                let tmp_theme_ext = "";
-                [ tmp_theme, tmp_theme_ext ] = get.theme.split(";");
-                if ((undefined !== tmp_theme) && ("" !== tmp_theme) && (theme !== tmp_theme)) {
-                    theme = tmp_theme;
-                    hasChanged = true;
-                }
-                if ((undefined !== tmp_theme_ext) && ("" !== tmp_theme_ext) && (theme_ext !== tmp_theme_ext)) {
-                    theme_ext = tmp_theme_ext;
-                    hasChanged = true;
-                }
-                if (hasChanged) {
-                    set_table();
-                }
-            }
-
             if ("0000-00-00 00:00:00" != get.date) {
                 if (timerCountdown == null) {
                     const timetoms = new Date(get.date) - Date.now();
@@ -310,10 +315,6 @@ function update_table ()
                     timeout = Number.parseInt(get.timeout, 10);
                 }
                 document.querySelectorAll(".timeout").forEach((el) => { el.checked = ("timeout-"+timeout == el.id); });
-            }
-            if ("" != get.suite && suiteName !== get.suite) {
-                suiteName = get.suite;
-                set_table();
             }
 
             switch (get.status) {
@@ -356,7 +357,6 @@ function set_apiSource ()
     stopCountDown(); // will display timout select
 
     document.addEventListener("visibilitychange", () => {
-        console.log("visibilityState="+document.visibilityState);
         if ("visible" == document.visibilityState) {
             if (inFocus) {
                 threshold = THRESHOLD_IN_FOCUS;
@@ -372,13 +372,11 @@ function set_apiSource ()
     document.addEventListener("focus", () => {
         inFocus = true;
         threshold = THRESHOLD_IN_FOCUS;
-        console.log("Page in focus");
     });
 
     document.addEventListener("blur", () => {
         inFocus = false;
         threshold = THRESHOLD_OUT_FOCUS;
-        console.log("Page out of focus");
     });
 }
 
