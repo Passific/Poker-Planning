@@ -1,0 +1,13 @@
+<svg width="245" height="375" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <text fill="#e8edf0" font-family="Open Sans,sans-serif" id="nb">6</text>
+ </defs>
+ <g>
+  <title>Card 6</title>
+  <rect fill="#e8edf0" x="1" y="1" width="243" height="373" rx="15"/>
+  <rect fill="#f2bc54" x="12" y="12" width="221" height="351" rx="10"/>
+  <use xlink:href="#nb" x="50%" y="50%" font-size="200" dominant-baseline="central" text-anchor="middle"/>
+  <use xlink:href="#nb" x="30" y="50" font-size="30" id="snb1"/>
+  <use xlink:href="#snb1" transform="rotate(180)" transform-origin="center"/>
+ </g>
+</svg>

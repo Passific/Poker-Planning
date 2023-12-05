@@ -15,7 +15,8 @@ const DEFAULT_TIMEOUT       = 60;
 const SPACER_CARD = "!spacer!";
 const CARD_SUITES = {
     "fibonacci2" : [0, 1, 2, 3, 5, 8, 13, 20, 40, 100, SPACER_CARD, "coffee", "infinite", "question"],
-    "confidence" : [1, 2, 3, 4, 5]
+    "confidence" : [1, 2, 3, 4, 5],
+    "scale" : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 }
 const DEFAULT_SUITE = "fibonacci2"; // "fibonacci2" or "confidence"
 
