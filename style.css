@@ -1,3 +1,13 @@
+body {
+  background-color: Canvas;
+  color: CanvasText;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  fieldset { border-color: #808080 }
+}
+
 .container {
   display: flex;
   justify-content: center; /* horizontal center */
@@ -63,7 +73,7 @@
 #home-btn a {
   font-size: 50px;
   text-decoration: none;
-  color: darkgray;
+  color: GrayText;
 }
 
 #table-select {
@@ -150,7 +160,7 @@
 }
 
 #countdown.expired {
-  color: red;
+  color: ActiveText;
   animation: blinker 1s linear infinite;
 }
 
@@ -166,10 +176,10 @@ input[type="radio"].timeout {
 
 input[type="radio"].timeout + label {
   padding: 0.3rem 0.5rem;
-  border: 1px dashed #ccc;
+  border: 1px dashed GrayText;
   border-radius: 6px;
 }
 
 input[type="radio"].timeout:checked + label {
-  border: 1px solid #000;
+  border: 1px solid CanvasText;
 }
