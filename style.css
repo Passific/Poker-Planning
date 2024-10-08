@@ -1,8 +1,4 @@
-body {
-  background-color: Canvas;
-  color: CanvasText;
-  color-scheme: light dark;
-}
+:root {color-scheme: light dark;}
 
 @media (prefers-color-scheme: dark) {
   fieldset { border-color: #808080 }
