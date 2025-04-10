@@ -11,6 +11,10 @@
   flex-direction: column;
 }
 
+.poker-planning img {
+  max-width: 100%;
+}
+
 #name-input {
   display: table-cell;
   height: 24px;
@@ -21,6 +25,7 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   padding: 10px 16px;
+  width: 93%;
 }
 
 #join {
@@ -49,6 +54,7 @@
   white-space: nowrap;
   vertical-align: middle;
   display: table-cell;
+  width: 17%;
 }
 
 .group {
@@ -80,10 +86,10 @@
   position: relative;
   display: inline-block;
   width: 630px;
+  max-width: 100%;
 }
 
 #poker-right-panel {
-  display: inline-block;
   vertical-align: top;
 }
 
@@ -97,18 +103,20 @@
 /* The poker card container - width and height can be ajusted. */
 .poker-card, .poker-card-spacer {
   background-color: transparent;
-  width: 122px;
-  height: 187px;
+  width: 20%;
+  max-width: 122px;
+  aspect-ratio: 2/3;
   display: inline-block;
   position: relative;
   z-index:10;
   perspective: 1000px; /* 3D effect */
 }
+.poker-card:hover {
+  z-index:100;
+}
 
 .poker-card-inner {
   position: relative;
-  width: 100%;
-  height: 100%;
   text-align: center;
   transition: transform 0.8s;
   transform-style: preserve-3d;
@@ -126,7 +134,6 @@
 
 .poker-card-select:hover .poker-card-inner {
   position: relative;
-  z-index:100;
   transform: scale(1.1);
 }
 
@@ -136,8 +143,6 @@
 
 .poker-card-front, .poker-card-back {
   position: absolute;
-  width: 100%;
-  height: 100%;
   -webkit-backface-visibility: hidden; /* Safari */
   backface-visibility: hidden;
 }
@@ -166,16 +171,16 @@
   }
 }
 
-input[type="radio"].timeout {
+input[type="radio"].timeout, input[type="radio"].tables {
   display: none;
 }
 
-input[type="radio"].timeout + label {
+input[type="radio"].timeout + label, input[type="radio"].tables + label {
   padding: 0.3rem 0.5rem;
   border: 1px dashed GrayText;
   border-radius: 6px;
 }
 
-input[type="radio"].timeout:checked + label {
+input[type="radio"].timeout:checked + label, input[type="radio"].tables:checked + label {
   border: 1px solid CanvasText;
 }

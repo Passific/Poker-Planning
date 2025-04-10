@@ -7,7 +7,6 @@ const CURRENT_VERSION = "0.4";
 
 const join = document.getElementById("join");
 const nameInput = document.getElementById("name-input");
-const tableInput = document.getElementById("table-input");
 
 const default_table_id = 2;
 
@@ -35,7 +34,7 @@ join.addEventListener("click", (event) => {
     }
 });
 
-document.querySelectorAll(".timeout").forEach((el) => {
+document.querySelectorAll(".tables").forEach((el) => {
     el.addEventListener('change', set_table);
 });
 
@@ -48,6 +47,6 @@ let table = JSON.parse(localStorage.getItem("table"));
 if (null === table) {
     table = default_table_id;
 }
-document.querySelectorAll(".timeout").forEach((el) => { el.checked = ("table-"+table == el.id); });
+document.querySelectorAll(".tables").forEach((el) => { el.checked = ("table-"+table == el.id); });
 
 nameInput.focus();
