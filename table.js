@@ -7,6 +7,7 @@ const CURRENT_VERSION = "0.5";
 
 const API_URL = "api.php?a=";
 
+/* Thresholds and timeouts in seconds */
 const THRESHOLD_IN_FOCUS    = 1;
 const THRESHOLD_OUT_FOCUS   = 3;
 const THRESHOLD_NOT_VISIBLE = 30;
@@ -18,30 +19,33 @@ const CARD_SUITES = {
     "confidence" : [1, 2, 3, 4, 5],
     "scale" : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 }
-const DEFAULT_SUITE = "fibonacci2"; // "fibonacci2" or "confidence"
+const DEFAULT_SUITE = "fibonacci2"; /// Can be "fibonacci2", "confidence" or "scale"
 
-let state     = "name";
-let theme     = "basic";
-let theme_ext = "svg";
-let counter   = 10;
-let inFocus   = true;
-let threshold = 1;
-const select = document.getElementById("poker-select");
-const selectSuite = document.getElementById("select-suite");
-const review = document.getElementById("poker-review");
-const result = document.getElementById("poker-result");
-const reset  = document.getElementById("reset");
-const reveal = document.getElementById("reveal");
+let state     = "name";  /// State machine current state
+let theme     = "basic"; /// Default card's theme
+let theme_ext = "svg";   /// Card's extension to use (may change depending on the theme)
+let counter   = 10;      /// Refresh counter
+let inFocus   = true;    /// Whether the page is in focus.
+let threshold = 1;       /// Refresh counter's threshold (in seconds)
+
+/* Get DOM elements */
+const selectEl = document.getElementById("poker-select");
+const selectSuiteEl = document.getElementById("select-suite");
+const reviewEl = document.getElementById("poker-review");
+const resultEl = document.getElementById("poker-result");
+const resetBtnEl  = document.getElementById("reset");
+const revealBtnEl = document.getElementById("reveal");
 const anonymousEl = document.getElementById("anonymous");
 const nameEl = document.getElementById("name");
 const countdownEl  = document.getElementById("countdown");
-let timerCountdown = null;
-let timeOutSelect  = false;
+
+let timerCountdown = null; /// Timer handler
+let timeOutSelect  = false; /// Display timeout selector
 
 /**
  * Fetch from API server.
  * @param {string} url - path to fetch on API server.
- * @returns {Object} fetched data
+ * @returns {Object} Promise with fetched data
  */
 function api_fetch (url)
 {
@@ -73,6 +77,10 @@ function countDown (time)
     return "Remaining time: " + time;
 }
 
+/**
+ * Set table's timeout on the server (from addEventListener's callback)
+ * @returns {Object} Promise with fetched data
+ */
 function ask_timeout ()
 {
     return api_fetch("timeout&t="+tableId+"&v="+this.value);
@@ -101,55 +109,61 @@ function stopCountDown ()
 
 /**
  * Start a countdown timer.
- * @param {number} timetogo - Time in seconds.
+ * @param {number} timeToGo - Time in seconds.
  * @returns {void}.
  */
-function startCountDown (timetogo)
+function startCountDown (timeToGo)
 {
     stopCountDown();
-    /* For imediate display */
-    countdownEl.innerHTML = countDown(timetogo);
+    /* For immediate display */
+    countdownEl.innerHTML = countDown(timeToGo);
     timeOutSelect = false;
     timerCountdown = setInterval(() => {
         if (null !== countdownEl) {
-            --timetogo;
-            if (timetogo < 0) {
+            --timeToGo;
+            if (timeToGo < 0) {
                 //stopCountDown();
                 countdownEl.classList.add("expired");
             }
             else {
-                countdownEl.innerHTML = countDown(timetogo);
+                countdownEl.innerHTML = countDown(timeToGo);
             }
         }
         else {
-            /* Timer disapeared */
+            /* Timer disappeared */
             stopCountDown();
         }
     }, 1000);
 }
 
+/**
+ * Reset client's table
+ */
 function do_reset ()
 {
     console.log("do reset");
     stopCountDown();
-    select.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
-    review.innerHTML= "";
-    result.innerHTML= "<legend>Results</legend>";
-    result.style.display = "none";
+    selectEl.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
+    reviewEl.innerHTML= "";
+    resultEl.innerHTML= "<legend>Results</legend>";
+    resultEl.style.display = "none";
     state = "select";
-    reset.disabled = true;
-    reveal.disabled = true;
+    resetBtnEl.disabled = true;
+    revealBtnEl.disabled = true;
 }
 
+/**
+ * Reveal cards
+ */
 function do_reveal ()
 {
     console.log("do reveal");
     stopCountDown();
     state = "reveal";
-    reset.disabled = false;
-    reveal.disabled = true;
+    resetBtnEl.disabled = false;
+    revealBtnEl.disabled = true;
     const results = [];
-    review.querySelectorAll(".poker-card").forEach((el) => {
+    reviewEl.querySelectorAll(".poker-card").forEach((el) => {
         el.classList.remove("poker-card-flip");
         results[el.dataset.id]||(results[el.dataset.id] = 0);
         results[el.dataset.id]++;
@@ -165,12 +179,15 @@ function do_reveal ()
             newLabel.classList.add("owner");
             newLabel.textContent = value;
             card.appendChild(newLabel);
-            result.appendChild(card);
-            result.style.display = "block";
+            resultEl.appendChild(card);
+            resultEl.style.display = "block";
         }
     });
 }
 
+/**
+ * Select or update user's cards on client and server
+ */
 function do_select_card ()
 {
     if ("select" === state || "update" === state) {
@@ -187,12 +204,15 @@ function do_select_card ()
     }
 }
 
+/**
+ * Select or update user's cards on client
+ */
 function select_card (id)
 {
     if ("select" === state || "update" === state) {
-        reset.disabled = false;
-        reveal.disabled = false;
-        select.querySelectorAll(".poker-card").forEach((el) => {
+        resetBtnEl.disabled = false;
+        revealBtnEl.disabled = false;
+        selectEl.querySelectorAll(".poker-card").forEach((el) => {
             if (id != el.dataset.id) {
                 el.classList.remove("selected");
                 el.classList.add("poker-card-flip");
@@ -209,26 +229,50 @@ function select_card (id)
     }
 }
 
+/**
+ * Send reset signal to server
+ * @returns {Object} Promise with fetched data
+ */
 function ask_reset ()
 {
     return api_fetch("reset&t="+tableId);
 }
 
+/**
+ * Send reveal signal to server
+ * @returns {Object} Promise with fetched data
+ */
 function ask_reveal ()
 {
     return api_fetch("reveal&t="+tableId);
 }
 
+/**
+ * Set table's suite on the server (from addEventListener's callback)
+ * @returns {Object} Promise with fetched data
+ */
 function ask_change_suite ()
 {
-    return api_fetch("suite&p="+selectSuite.value+"&t="+tableId);
+    return api_fetch("suite&p="+this.value+"&t="+tableId);
 }
 
+/**
+ * Send reveal signal to server (from addEventListener's callback)
+ * @returns {Object} Promise with fetched data
+ */
 function ask_anonymous ()
 {
-    return api_fetch("anonymous&v="+(anonymousEl.checked?1:0)+"&t="+tableId);
+    return api_fetch("anonymous&v="+(this.checked?1:0)+"&t="+tableId);
 }
 
+/**
+ * Main function called every seconds:
+ *  - execute if refresh threshold reached
+ *  - retrieve server's state
+ *  - update client accordingly
+ *  - recover previous session
+ *  - recover from inconsistent client/server states
+ */
 function update_table ()
 {
     if (counter >= threshold) {
@@ -240,9 +284,9 @@ function update_table ()
                 }
             }
             let isPokerStarted = false;
-            const isAnonyous = get.anonymous;
-            anonymousEl.checked = isAnonyous;
-            review.innerHTML= "";
+            const isAnonymous = get.anonymous;
+            anonymousEl.checked = isAnonymous;
+            reviewEl.innerHTML= "";
             const newTableStatus = get.status;
             let hasTableChanged = false;
 
@@ -284,13 +328,13 @@ function update_table ()
                         else {
                             card.classList.remove("poker-card-flip");
                         }
-                        if (! isAnonyous) {
+                        if (! isAnonymous) {
                             const newLabel = document.createElement("span");
                             newLabel.classList.add("owner");
                             newLabel.textContent = val.owner;
                             card.appendChild(newLabel);
                         }
-                        review.appendChild(card);
+                        reviewEl.appendChild(card);
                         isPokerStarted = true;
                     }
                 }
@@ -298,15 +342,15 @@ function update_table ()
 
             if ("0000-00-00 00:00:00" != get.date) {
                 if (timerCountdown == null) {
-                    const timetoms = new Date(get.date) - Date.now();
-                    let timetos = Math.floor(timetoms/1000) /* ms to s */;
+                    const timeToMs = new Date(get.date) - Date.now();
+                    let timeToS = Math.floor(timeToMs/1000) /* ms to s */;
                     if (get.timeout) {
-                        timetos += Number.parseInt(get.timeout, 10);
+                        timeToS += Number.parseInt(get.timeout, 10);
                     }
                     else {
-                        timetos += DEFAULT_TIMEOUT;
+                        timeToS += DEFAULT_TIMEOUT;
                     }
-                    startCountDown(timetos);
+                    startCountDown(timeToS);
                 }
             }
             else {
@@ -318,11 +362,11 @@ function update_table ()
                 document.querySelectorAll(".timeout").forEach((el) => { el.checked = ("timeout-"+timeout == el.id); });
             }
 
-            switch (get.status) {
+            switch (newTableStatus) {
             case "0": /* Select */
-                if (isPokerStarted && true == reset.disabled) {
-                    reset.disabled = false;
-                    reveal.disabled = false;
+                if (isPokerStarted && true == resetBtnEl.disabled) {
+                    resetBtnEl.disabled = false;
+                    revealBtnEl.disabled = false;
                 }
                 if ("select" !== state && "update" !== state) {
                     /* Table status is to select, but client status is not */
@@ -336,6 +380,10 @@ function update_table ()
                 }
                 break;
             case "2": /* Reset */
+                /**
+                 * !Important! 'reset' is not a status for the client,
+                 * it's a transition to 'select' state (the default state).
+                 */
                 if ("select" !== state) {
                     /* Table status is to reset, but client status is not */
                     do_reset();
@@ -351,11 +399,15 @@ function update_table ()
     }
 }
 
-function set_apiSource ()
+/**
+ * Start client's table
+ * MUST be called ONCE.
+ */
+function startTable ()
 {
-    update_table(); // supercharge first refresh
+    update_table(); // Supercharge first refresh
     setInterval(update_table, 1000 /* 1s */);
-    stopCountDown(); // will display timout select
+    stopCountDown(); // Will display timeout select
 
     document.addEventListener("visibilitychange", () => {
         if ("visible" == document.visibilityState) {
@@ -381,16 +433,20 @@ function set_apiSource ()
     });
 }
 
-function set_table()
+/**
+ * Display card selector depending on selected suite.
+ */
+function set_table ()
 {
     let count = 1;
     if (undefined === CARD_SUITES[suiteName]) {
         suiteName = DEFAULT_SUITE;
     }
-    select.innerHTML = "";
+    selectEl.innerHTML = "";
     for (const Nb in CARD_SUITES[suiteName]) {
         const cardNb = CARD_SUITES[suiteName][Nb];
         if (SPACER_CARD != cardNb) {
+            /* Create Card */
             const card_back = document.createElement("div");
             card_back.classList.add("poker-card-back");
             const back_img = document.createElement("img");
@@ -413,49 +469,53 @@ function set_table()
             card.dataset.id = count; card.dataset.value = cardNb;
             card.addEventListener("click", do_select_card);
             card.appendChild(card_inner);
-            select.appendChild(card);
+            selectEl.appendChild(card);
             count++;
         }
         else {
+            /* Spacer Card */
             let spacer = document.createElement("div");
             spacer.classList.add("poker-card-spacer");
-            select.appendChild(spacer);
+            selectEl.appendChild(spacer);
         }
     }
-    selectSuite.innerHTML = "";
+    selectSuiteEl.innerHTML = "";
     for (const Suite in CARD_SUITES) {
         const optionEl = document.createElement("option");
         optionEl.textContent = Suite;
         if (suiteName === Suite) {
             optionEl.setAttribute("selected", "true");
         }
-        selectSuite.appendChild(optionEl);
+        selectSuiteEl.appendChild(optionEl);
     }
-    select.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
+    selectEl.querySelectorAll(".poker-card").forEach((el) => { el.classList.remove("poker-card-flip", "selected"); });
 }
 
 const userName = JSON.parse(localStorage.getItem("userName"));
 const tableId = getParameterByName("table");
 let suiteName = DEFAULT_SUITE;
 
+console.log(`%cMade by Passific. Version ${CURRENT_VERSION}`,"color: white; font-size: x-large; font-weight: bold; background-color: #0b0f3e; margin: 10px; padding: 10px", );
+
 if (null !== userName
         && null !== tableId /* parameter found */
         && "" !== tableId /* parameter has value */
         && (+tableId === +tableId) /* check if it's a number */
         ) {
-    reset.disabled = true;
-    reveal.disabled = true;
-    reset.addEventListener("click", ask_reset);
-    reveal.addEventListener("click", ask_reveal);
-    selectSuite.addEventListener("change", ask_change_suite);
+    resetBtnEl.disabled = true;
+    revealBtnEl.disabled = true;
+    resetBtnEl.addEventListener("click", ask_reset);
+    revealBtnEl.addEventListener("click", ask_reveal);
+    selectSuiteEl.addEventListener("change", ask_change_suite);
     anonymousEl.addEventListener("change", ask_anonymous);
 
     nameEl.textContent = userName;
     suiteName = getParameterByName("suite");
 
     state = "select";
-    set_apiSource();
+    startTable();
 }
 else {
+    /* Redirect to landing page if any table parameter is missing */
     window.location.href = "index.html";
 }
