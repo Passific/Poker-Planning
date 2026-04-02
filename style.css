@@ -9,13 +9,14 @@
   justify-content: center; /* horizontal center */
   align-items: center;     /* vertical center */
   flex-direction: column;
+  gap: 12px;
 }
 
 .poker-planning img {
   max-width: 100%;
 }
 
-#name-input {
+.btn-group-input {
   display: table-cell;
   height: 24px;
   font-size: 28px;
@@ -28,9 +29,10 @@
   width: 93%;
 }
 
-#join {
+.btn-group-btn {
   height: 46px;
-  font-size: 28px;
+  min-width: 144px;
+  font-size: 24px;
   display: table-cell;
   vertical-align: middle;
   padding: 0 16px;
@@ -42,6 +44,34 @@
   background-color: #5cb85c;
   border-color: #4cae4c;
   margin-left: -1px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-group-btn:disabled {
+  background-color: #c0c0c0;
+  border-color: #a9a9a9;
+  cursor: not-allowed;
+}
+
+.btn-group-btn[data-kind="checking"] {
+  background-color: #8b8b8b;
+  border-color: #767676;
+}
+
+.btn-group-btn[data-kind="join"] {
+  background-color: #2d8fdd;
+  border-color: #256fae;
+}
+
+.btn-group-btn[data-kind="create"] {
+  background-color: #5cb85c;
+  border-color: #4cae4c;
+}
+
+.btn-group-btn[data-kind="error"] {
+  background-color: #c96b32;
+  border-color: #a05324;
 }
 
 #table-input {
@@ -62,6 +92,61 @@
   position: relative;
   display: table;
   height: 46px;
+  width: min(100%, 560px);
+}
+
+#room-select {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#room-input {
+  text-transform: uppercase;
+  border-radius: 6px;
+}
+
+.group > .btn-group-input:only-child {
+  box-sizing: border-box;
+  height: 46px;
+  width: 100%;
+}
+
+#copy-link {
+  padding: 0 14px;
+  border: 1px solid #7a7a7a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#room-help,
+#room-info,
+#room-status,
+#room-lock {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  color: GrayText;
+}
+
+#room-lock {
+  margin-bottom: 0;
+}
+
+#room-lock a {
+  color: inherit;
+}
+
+#room-status {
+  min-height: 1.4em;
+  margin-top: 0;
+}
+
+.btn-group-input.is-locked {
+  background-color: rgba(127, 127, 127, 0.12);
+  color: GrayText;
 }
 
 .poker-control-group {
@@ -70,6 +155,7 @@
 
 #home-btn, #home {
   display: inline-block;
+  vertical-align: center;
 }
 
 #home-btn a {
@@ -98,6 +184,45 @@
   text-align: center;
   border-radius: 5px;
   margin-bottom: 5px;
+}
+
+#participants-panel {
+  border-radius: 5px;
+  margin-bottom: 5px;
+}
+
+#participants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 20px;
+}
+
+.participant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.participant-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-status {
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.participant-status.waiting {
+  border: 1px solid #9b7f00;
+}
+
+.participant-status.voted {
+  border: 1px solid #2f8f2f;
 }
 
 /* The poker card container - width and height can be ajusted. */
@@ -135,6 +260,7 @@
 .poker-card-select:hover .poker-card-inner {
   position: relative;
   transform: scale(1.1);
+  cursor: pointer;
 }
 
 .poker-card-flip .poker-card-inner {
@@ -180,8 +306,15 @@ input[type="radio"].timeout + label, input[type="radio"].tables + label {
   padding: 0.3rem 0.5rem;
   border: 1px dashed GrayText;
   border-radius: 6px;
+  cursor: pointer;
 }
 
 input[type="radio"].timeout:checked + label, input[type="radio"].tables:checked + label {
   border: 1px solid CanvasText;
+}
+
+@media (max-width: 700px) {
+  .btn-group-input, .btn-group-btn {
+    font-size: 20px;
+  }
 }

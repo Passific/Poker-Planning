@@ -12,11 +12,12 @@
     <div id="home-btn"><a href="index.html" title="Home">&#8962;</a></div>
     <div id="home">
         <div>Hello <span id="name">???</span></div>
+        <div id="room-info">Room: <strong id="room-code">???</strong> <button id="copy-link" type="button">Copy link</button></div>
         <div id="poker-control">
             <button id="reset">Reset</button>
             <button id="reveal">Reveal</button>
             <span id="countdown"></span>
-            <span>Suite: <select id="select-suite"></select></span>
+            <span>| Suite: <select id="select-suite"></select></span>
             <label><input id="anonymous" type="checkbox" value="0">Anonymous</label>
         </div>
     </div>
@@ -24,6 +25,7 @@
 <div id="poker-select"></div>
 <div id="poker-right-panel">
     <fieldset id="poker-result"><legend>Results</legend></fieldset>
+    <fieldset id="participants-panel"><legend>Participants</legend><div id="participants-list"></div></fieldset>
     <div id="poker-review"></div>
 </div>
 <script type="text/javascript" src="table.js"></script>

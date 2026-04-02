@@ -11,15 +11,15 @@
 <div class="container">
     <div class="poker-planning"><img src="cards/basic/back.svg" alt="PP"></div>
     <div class="group">
-        <input id="name-input" value="" placeholder="What's your name?">
-        <span class="btn-group"><button id="join">Join</button></span>
+        <input class="btn-group-input" id="name-input" value="" placeholder="What's your name?" required>
+        <span class="btn-group"><button class="btn-group-btn" id="room-action" disabled>Enter room</button></span>
     </div>
-    <br>
-    <span id="table-select">
-        Table:
-        <input type="radio" name="table" class="tables" id="table-2" value="2"><label for="table-2">M1</label>
-        <input type="radio" name="table" class="tables" id="table-3" value="3"><label for="table-3">M2</label>
-    </span>
+    <div class="group">
+        <input class="btn-group-input" id="room-input" value="" placeholder="Room code (optional)">
+    </div>
+    <p id="room-lock" hidden>Room: <strong id="room-lock-name"></strong> <a href="index.html">[change]</a></p>
+    <p id="room-status" aria-live="polite">Enter your name to create a room automatically, or provide a room code to join.</p>
+    <p id="room-help">Use a shared link, enter a room code to join, or leave it empty to create a new room.</p>
 </div>
 <script type="text/javascript" src="script.js"></script>
 </body>

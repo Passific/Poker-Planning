@@ -1,4 +1,4 @@
-<?
+<?php
 include("config.php");
 include("config.bdd.php");
 
@@ -6,131 +6,392 @@ date_default_timezone_set("Europe/Paris");
 header("Server: Passific");
 header("X-Powered-By: Passific");
 header("Content-Type: application/json; charset=utf-8");
+header("X-Content-Type-Options: nosniff");
+header("Cache-Control: no-store");
 
-$bdderror = NULL;
-//  Data Base access function
-function bdd_access($query)
+const DEFAULT_TIMEOUT = 60;
+const DEFAULT_SUITE = "fibonacci2";
+const EMPTY_DATE = "0000-00-00 00:00:00";
+const PRESENCE_TTL_SECONDS = 120;
+
+$pdo = null;
+
+function send_json($payload)
 {
-    try
-    {
-        global $site_bdd, $site_bdd_user, $site_bdd_pass;
-        $pdo_options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_EXCEPTION;
-        $bdd = new PDO($site_bdd, $site_bdd_user, $site_bdd_pass, $pdo_options);
-        $reponse = $bdd->query($query);
-        $bdd = NULL;
-        return $reponse;
+    echo json_encode($payload);
+    exit;
+}
+
+function get_pdo()
+{
+    global $pdo, $site_bdd, $site_bdd_user, $site_bdd_pass;
+
+    if (null !== $pdo) {
+        return $pdo;
     }
-    catch (Exception $e)
-    {
-        global $bdderror;
-        $bdderror = $e->getMessage();
-//~         die($e->getMessage());  //debug
-        die('Oups...');
+
+    $pdo = new PDO(
+        $site_bdd,
+        $site_bdd_user,
+        $site_bdd_pass,
+        array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC)
+    );
+    return $pdo;
+}
+
+function exec_stmt($sql, $params = array())
+{
+    $stmt = get_pdo()->prepare($sql);
+    $stmt->execute($params);
+    return $stmt;
+}
+
+function sanitize_room($room)
+{
+    $room = strtoupper(trim((string)$room));
+    $room = preg_replace('/ /', '_', $room);
+    $room = preg_replace('/[^A-Z0-9_-]/', '', $room);
+    if (strlen($room) > 24) {
+        $room = substr($room, 0, 24);
+    }
+    return $room;
+}
+
+function sanitize_owner($owner)
+{
+    $owner = trim((string)$owner);
+    $owner = preg_replace('/[\x00-\x1f\x7f]/u', '', $owner); /* strip null bytes and control characters */
+    $owner = preg_replace('/\s+/', ' ', $owner);
+    if (strlen($owner) > 50) {
+        $owner = substr($owner, 0, 50);
+    }
+    return $owner;
+}
+
+function generate_room_code($length = 8)
+{
+    $alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    $maxIndex = strlen($alphabet) - 1;
+    $code = "";
+    for ($i = 0; $i < $length; $i++) {
+        $code .= $alphabet[random_int(0, $maxIndex)];
+    }
+    return $code;
+}
+
+function get_room_row($roomCode)
+{
+    global $site_bdd_prefix;
+    $stmt = exec_stmt(
+        "SELECT * FROM `".$site_bdd_prefix."tables` WHERE `room_code`=:room_code LIMIT 1",
+        array(':room_code' => $roomCode)
+    );
+    return $stmt->fetch();
+}
+
+function room_exists($roomCode)
+{
+    return false !== get_room_row($roomCode);
+}
+
+function create_room($requestedCode = "")
+{
+    global $site_bdd_prefix;
+
+    $roomCode = sanitize_room($requestedCode);
+    if ("" !== $roomCode) {
+        if (room_exists($roomCode)) {
+            return array('result' => false, 'error' => 'room_exists');
+        }
+    }
+
+    if ("" === $roomCode) {
+        for ($i = 0; $i < 20; $i++) {
+            $candidate = generate_room_code();
+            if (!room_exists($candidate)) {
+                $roomCode = $candidate;
+                break;
+            }
+        }
+    }
+
+    if ("" === $roomCode) {
+        return array('result' => false, 'error' => 'room_generation_failed');
+    }
+
+    try {
+        exec_stmt(
+            "INSERT INTO `".$site_bdd_prefix."tables` (`room_code`, `status`, `date`, `timeout`, `suite`, `theme`, `anonymous`, `version`, `created_at`, `updated_at`)\n         VALUES (:room_code, 0, NULL, :timeout, :suite, '', 0, 1, NOW(), NOW())",
+            array(':room_code' => $roomCode, ':timeout' => DEFAULT_TIMEOUT, ':suite' => DEFAULT_SUITE)
+        );
+    } catch (PDOException $e) {
+        if ('23000' === $e->getCode()) {
+            return array('result' => false, 'error' => 'room_exists');
+        }
+        throw $e;
+    }
+
+    return array('result' => true, 'room' => $roomCode);
+}
+
+function get_room_id($roomCode)
+{
+    $row = get_room_row($roomCode);
+    if (false === $row) {
         return null;
     }
-    return null;
+    return intval($row['id']);
 }
 
-function api($action, $param, $value, $table)
+function table_touch_update($roomCode, $setClause, $params)
 {
-    global $site_bdd_prefix, $site_bdd_user, $site_bdd_pass;
-    $result = false;
-    switch ($action) {
-    case "reset":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `status`='2', `date`='0000-00-00 00:00:00' WHERE `id`='".$table."'") ) {
-            if (bdd_access("DELETE FROM `".$site_bdd_prefix."cards` WHERE `table`='".$table."'")) {
-                $result = true;
-            }
-        }
-        echo json_encode( array("result"=>$result, "data" => "") );
-        break;
-    case "reveal":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `status`='1', `date`='0000-00-00 00:00:00' WHERE `id`='".$table."'") ) {
-            $result = true;
-        }
-        echo json_encode( array("result"=>$result, "data" => "") );
-        break;
-    case "update":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."cards` SET `value`='".$value."' WHERE `table`='".$table."' AND `owner`='".$param."'") ) {
-            $result = true;
-        }
-        echo json_encode( array("result"=>$result, "data" => "") );
-        break;
-    case "timeout":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `timeout`='".$value."', `date`='0000-00-00 00:00:00' WHERE `id`='".$table."'") ) {
-            $result = true;
-        }
-        echo json_encode( array("result"=>$result, "data" => "") );
-        break;
-    case "suite":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `suite`='".$param."' WHERE `id`='".$table."'") ) {
-            $result = api("reset", $param, $value, $table);
-        }
-        else {
-            echo json_encode( array("result"=>$result, "data" => "") );
-        }
-        break;
-    case "anonymous":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `anonymous`='".$value."' WHERE `id`='".$table."'") ) {
-            $result = api("reset", $param, $value, $table);
-        }
-        else {
-            echo json_encode( array("result"=>$result, "data" => "") );
-        }
-        break;
-    case "get":
-        $data = array();
-        $reponse = bdd_access("SELECT * FROM `".$site_bdd_prefix."cards`WHERE `table`='".$table."' ORDER BY `owner` asc");
-        while($donnees = $reponse->fetch()) {
-            array_push($data, array("id" => $donnees['id'], "value" => $donnees['value'], "table" => $donnees['table'], "owner" => $donnees['owner']));
-        }$reponse->closeCursor();
-        $tableStatus = 0;
-        $tableDate = '0000-00-00 00:00:00';
-        $reponse2 = bdd_access("SELECT * FROM `".$site_bdd_prefix."tables` WHERE `id`='".$table."'");
-        while($donnees2 = $reponse2->fetch()) {
-            $tableStatus = $donnees2['status'];
-            $tableDate = $donnees2['date'];
-            $tableTimeout = $donnees2['timeout'];
-            $tableSuite = $donnees2['suite'];
-            $tableTheme = $donnees2['theme'];
-            $tableAnon = ("1" == $donnees2['anonymous']);
-            $result = true;
-        }$reponse->closeCursor();
-        echo json_encode( array("result"=>$result, "data" => $data, "status" => $tableStatus, "date" => $tableDate, "timeout" => $tableTimeout, "suite" => $tableSuite, "theme" => $tableTheme, "anonymous" => $tableAnon ));
-        break;
-    case "select":
-        if( bdd_access("UPDATE `".$site_bdd_prefix."tables` SET `status`='0', `date`=IF(`date`='0000-00-00 00:00:00', NOW(), `date`) WHERE `id`='".$table."'") ) {
-            if (bdd_access("INSERT INTO `".$site_bdd_prefix."cards` (`id`, `value`, `table`, `owner`) VALUES ('',".$value.", ".$table.", '".$param."')")) {
-                $result = true;
-            }
-        }
-        echo json_encode( array("result" => $result, "data" => "") );
-        break;
-    case "create":
-        if( bdd_access("INSERT INTO `".$site_bdd_prefix."tables` (`id`, `status`, `date`, `timeout`) VALUES (".$table.", '0', '0000-00-00 00:00:00', 60)") ) {
-            $result = true;
-        }
-        echo json_encode( array("result" => $result, "data" => "") );
-        break;
-    case "delete":
-        if (bdd_access("DELETE FROM `".$site_bdd_prefix."tables` WHERE `id`='".$table."'")) {
-            $result = true;
-        }
-        echo json_encode( array("result" => $result, "data" => "") );
-        break;
-    default:
-        echo json_encode( array("result" => false, "data" => "Unknown error.") );
-        break;
-    }
-    return $result;
+    global $site_bdd_prefix;
+
+    $params[':room_code'] = $roomCode;
+    exec_stmt(
+        "UPDATE `".$site_bdd_prefix."tables`\n         SET ".$setClause.", `version`=`version`+1, `updated_at`=NOW()\n         WHERE `room_code`=:room_code",
+        $params
+    );
+
+    return true;
 }
 
-$action = isset($_GET['a'])?$_GET['a']:"";
-// Remove new lines and extra spaces
-$param = isset($_GET['p'])?stripslashes(htmlspecialchars(preg_replace('/\s+/', ' ', trim($_GET['p'])), ENT_QUOTES, "UTF-8")):"";
-$value = isset($_GET['v'])?intval($_GET['v']):0;
-$table = isset($_GET['t'])?intval($_GET['t']):0;
+function touch_presence($roomId, $owner)
+{
+    global $site_bdd_prefix;
 
-api($action, $param, $value, $table);
+    if ("" === $owner) {
+        return;
+    }
 
-?>
+    exec_stmt(
+        "INSERT INTO `".$site_bdd_prefix."presence` (`room_id`, `owner`, `last_seen`)\n         VALUES (:room_id, :owner, NOW())\n         ON DUPLICATE KEY UPDATE `last_seen`=NOW()",
+        array(':room_id' => $roomId, ':owner' => $owner)
+    );
+}
+
+function get_participants($roomId)
+{
+    global $site_bdd_prefix;
+
+    $stmt = exec_stmt(
+        "SELECT p.`owner`, p.`last_seen`, c.`id` AS `card_id`\n         FROM `".$site_bdd_prefix."presence` p\n         LEFT JOIN `".$site_bdd_prefix."cards` c ON c.`room_id`=p.`room_id` AND c.`owner`=p.`owner`\n         WHERE p.`room_id`=:room_id\n         ORDER BY p.`owner` ASC",
+        array(':room_id' => $roomId)
+    );
+
+    $participants = array();
+    while ($row = $stmt->fetch()) {
+        $lastSeenTs = strtotime($row['last_seen']);
+        $connected = false;
+        if (false !== $lastSeenTs) {
+            $connected = (time() - $lastSeenTs) <= PRESENCE_TTL_SECONDS;
+        }
+
+        $participants[] = array(
+            'owner' => $row['owner'],
+            'voted' => (null !== $row['card_id']),
+            'connected' => $connected,
+            'last_seen' => $row['last_seen']
+        );
+    }
+
+    return $participants;
+}
+
+function get_table_state($roomCode, $sinceVersion, $owner)
+{
+    global $site_bdd_prefix;
+
+    $table = get_room_row($roomCode);
+    if (false === $table) {
+        return array('result' => false, 'exists' => false);
+    }
+
+    $roomId = intval($table['id']);
+    touch_presence($roomId, $owner);
+
+    /* Keep presence table compact over time (~1% of requests) */
+    if (mt_rand(0, 99) === 0) {
+        exec_stmt(
+            "DELETE FROM `".$site_bdd_prefix."presence` WHERE `last_seen` < (NOW() - INTERVAL 7 DAY)"
+        );
+    }
+
+    $participants = get_participants($roomId);
+
+    $currentVersion = intval($table['version']);
+    if ($sinceVersion >= $currentVersion) {
+        return array(
+            'result' => true,
+            'exists' => true,
+            'changed' => false,
+            'version' => $currentVersion,
+            'status' => strval($table['status']),
+            'date' => (null === $table['date']) ? EMPTY_DATE : $table['date'],
+            'timeout' => intval($table['timeout']),
+            'suite' => (string)$table['suite'],
+            'theme' => (string)$table['theme'],
+            'anonymous' => ('1' === strval($table['anonymous'])),
+            'data' => array(),
+            'participants' => $participants
+        );
+    }
+
+    $stmt = exec_stmt(
+        "SELECT `id`, `value`, `owner`\n         FROM `".$site_bdd_prefix."cards`\n         WHERE `room_id`=:room_id\n         ORDER BY `owner` ASC",
+        array(':room_id' => $roomId)
+    );
+
+    $cards = array();
+    while ($row = $stmt->fetch()) {
+        $cards[] = array(
+            'id' => intval($row['id']),
+            'value' => intval($row['value']),
+            'owner' => $row['owner']
+        );
+    }
+
+    return array(
+        'result' => true,
+        'exists' => true,
+        'changed' => true,
+        'version' => $currentVersion,
+        'status' => strval($table['status']),
+        'date' => (null === $table['date']) ? EMPTY_DATE : $table['date'],
+        'timeout' => intval($table['timeout']),
+        'suite' => (string)$table['suite'],
+        'theme' => (string)$table['theme'],
+        'anonymous' => ('1' === strval($table['anonymous'])),
+        'data' => $cards,
+        'participants' => $participants
+    );
+}
+
+try {
+    $action = isset($_GET['a']) ? $_GET['a'] : "";
+    $owner = sanitize_owner(isset($_GET['p']) ? $_GET['p'] : "");
+    $value = isset($_GET['v']) ? intval($_GET['v']) : 0;
+    $room = sanitize_room(isset($_GET['room']) ? $_GET['room'] : "");
+    $since = isset($_GET['since']) ? intval($_GET['since']) : -1;
+
+    switch ($action) {
+        case 'create_room': {
+            $result = create_room($room);
+            send_json($result);
+            break;
+        }
+
+        case 'room_exists': {
+            if ("" === $room) {
+                send_json(array('result' => false, 'exists' => false, 'error' => 'missing_room'));
+            }
+            send_json(array('result' => true, 'exists' => room_exists($room)));
+            break;
+        }
+
+        case 'get': {
+            if ("" === $room) {
+                send_json(array('result' => false, 'exists' => false, 'error' => 'missing_room'));
+            }
+            send_json(get_table_state($room, $since, $owner));
+            break;
+        }
+
+        case 'select':
+        case 'update': {
+            if ("" === $room || "" === $owner || $value <= 0 || $value > 200) {
+                send_json(array('result' => false, 'error' => 'invalid_input'));
+            }
+
+            $roomId = get_room_id($room);
+            if (null === $roomId) {
+                send_json(array('result' => false, 'error' => 'room_not_found'));
+            }
+
+            touch_presence($roomId, $owner);
+
+            exec_stmt(
+                "INSERT INTO `".$site_bdd_prefix."cards` (`room_id`, `owner`, `value`, `updated_at`)\n                 VALUES (:room_id, :owner, :value, NOW())\n                 ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `updated_at`=NOW()",
+                array(':room_id' => $roomId, ':owner' => $owner, ':value' => $value)
+            );
+
+            table_touch_update($room, "`status`=0, `date`=IF(`date` IS NULL, NOW(), `date`)", array());
+            send_json(array('result' => true));
+            break;
+        }
+
+        case 'reset': {
+            if ("" === $room) {
+                send_json(array('result' => false, 'error' => 'missing_room'));
+            }
+
+            $roomId = get_room_id($room);
+            if (null === $roomId) {
+                send_json(array('result' => false, 'error' => 'room_not_found'));
+            }
+
+            exec_stmt("DELETE FROM `".$site_bdd_prefix."cards` WHERE `room_id`=:room_id", array(':room_id' => $roomId));
+            table_touch_update($room, "`status`=2, `date`=NULL", array());
+            send_json(array('result' => true));
+            break;
+        }
+
+        case 'reveal': {
+            if ("" === $room) {
+                send_json(array('result' => false, 'error' => 'missing_room'));
+            }
+            table_touch_update($room, "`status`=1, `date`=NULL", array());
+            send_json(array('result' => true));
+            break;
+        }
+
+        case 'timeout': {
+            if ("" === $room || $value <= 0 || $value > 3600) {
+                send_json(array('result' => false, 'error' => 'invalid_input'));
+            }
+            table_touch_update($room, "`timeout`=:timeout, `date`=NULL", array(':timeout' => $value));
+            send_json(array('result' => true));
+            break;
+        }
+
+        case 'suite': {
+            $suite = sanitize_room($owner);
+            if ("" === $room || "" === $suite) {
+                send_json(array('result' => false, 'error' => 'invalid_input'));
+            }
+
+            table_touch_update($room, "`suite`=:suite", array(':suite' => strtolower($suite)));
+
+            $roomId = get_room_id($room);
+            if (null !== $roomId) {
+                exec_stmt("DELETE FROM `".$site_bdd_prefix."cards` WHERE `room_id`=:room_id", array(':room_id' => $roomId));
+                table_touch_update($room, "`status`=2, `date`=NULL", array());
+            }
+
+            send_json(array('result' => true));
+            break;
+        }
+
+        case 'anonymous': {
+            if ("" === $room) {
+                send_json(array('result' => false, 'error' => 'missing_room'));
+            }
+            table_touch_update($room, "`anonymous`=:anonymous", array(':anonymous' => (1 === $value ? 1 : 0)));
+
+            $roomId = get_room_id($room);
+            if (null !== $roomId) {
+                exec_stmt("DELETE FROM `".$site_bdd_prefix."cards` WHERE `room_id`=:room_id", array(':room_id' => $roomId));
+                table_touch_update($room, "`status`=2, `date`=NULL", array());
+            }
+
+            send_json(array('result' => true));
+            break;
+        }
+
+        default:
+            send_json(array('result' => false, 'error' => 'unknown_action'));
+    }
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    send_json(array('result' => false, 'error' => 'server_error'));
+}
