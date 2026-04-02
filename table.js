@@ -302,7 +302,7 @@ function applyServerTableState(get)
 {
     if (!get.result || !get.exists) {
         if (confirm("This room does not seem to exist, would you like to go back?")) {
-            window.location.href = "index.html" + ("" !== roomCodeFromUrl ? "?create=" + encodeURIComponent(roomCodeFromUrl) : "");
+            window.location.href = "index.html" + ("" !== roomCode ? "?create=" + encodeURIComponent(roomCode) : "");
         }
         return;
     }
@@ -571,5 +571,5 @@ if (
     startTable();
 }
 else {
-    window.location.href = "index.html" + ("" !== roomCodeFromUrl ? "?room=" + encodeURIComponent(roomCodeFromUrl) : "");
+    window.location.href = "index.html" + ("" !== roomCode ? "?room=" + encodeURIComponent(roomCode) : "");
 }
