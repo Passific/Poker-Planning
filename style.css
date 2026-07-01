@@ -175,6 +175,10 @@
   max-width: 100%;
 }
 
+#poker-select {
+  margin-bottom: 8px;
+}
+
 #poker-right-panel {
   vertical-align: top;
 }
@@ -225,12 +229,13 @@
   border: 1px solid #2f8f2f;
 }
 
-/* The poker card container - width and height can be ajusted. */
+/* The poker card container - width and height can be adjusted. */
 .poker-card, .poker-card-spacer {
   background-color: transparent;
   width: 20%;
   max-width: 122px;
   display: inline-block;
+  vertical-align: top;
   position: relative;
   z-index:10;
   perspective: 1000px; /* 3D effect */
@@ -253,8 +258,15 @@
 }
 
 .poker-card-result {
-  width: 61px;
-  height: 84px;
+  width: calc(61px * var(--result-scale, 1));
+  vertical-align: bottom;
+}
+
+#poker-result .poker-card-spacer-reveal {
+  width: 14px !important;
+  max-width: 14px !important;
+  min-width: 14px;
+  display: inline-block;
 }
 
 .poker-card-select:hover .poker-card-inner {

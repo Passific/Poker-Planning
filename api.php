@@ -149,7 +149,7 @@ function table_touch_update($roomCode, $setClause, $params)
 
     $params[':room_code'] = $roomCode;
     exec_stmt(
-        "UPDATE `".$site_bdd_prefix."tables`\n         SET ".$setClause.", `version`=`version`+1, `updated_at`=NOW()\n         WHERE `room_code`=:room_code",
+        "UPDATE `".$site_bdd_prefix."tables` SET ".$setClause.", `version`=`version`+1, `updated_at`=NOW() WHERE `room_code`=:room_code",
         $params
     );
 
@@ -175,7 +175,7 @@ function get_participants($roomId)
     global $site_bdd_prefix;
 
     $stmt = exec_stmt(
-        "SELECT p.`owner`, p.`last_seen`, c.`id` AS `card_id`\n         FROM `".$site_bdd_prefix."presence` p\n         LEFT JOIN `".$site_bdd_prefix."cards` c ON c.`room_id`=p.`room_id` AND c.`owner`=p.`owner`\n         WHERE p.`room_id`=:room_id\n         ORDER BY p.`owner` ASC",
+        "SELECT p.`owner`, p.`last_seen`, c.`id` AS `card_id` FROM `".$site_bdd_prefix."presence` p LEFT JOIN `".$site_bdd_prefix."cards` c ON c.`room_id`=p.`room_id` AND c.`owner`=p.`owner` WHERE p.`room_id`=:room_id ORDER BY p.`owner` ASC",
         array(':room_id' => $roomId)
     );
 
@@ -238,15 +238,16 @@ function get_table_state($roomCode, $sinceVersion, $owner)
     }
 
     $stmt = exec_stmt(
-        "SELECT `id`, `value`, `owner`\n         FROM `".$site_bdd_prefix."cards`\n         WHERE `room_id`=:room_id\n         ORDER BY `owner` ASC",
+        "SELECT `id`, `value`, `owner` FROM `".$site_bdd_prefix."cards` WHERE `room_id`=:room_id ORDER BY `owner` ASC",
         array(':room_id' => $roomId)
     );
 
+    $isRevealed = (1 === intval($table['status']));
     $cards = array();
     while ($row = $stmt->fetch()) {
         $cards[] = array(
             'id' => intval($row['id']),
-            'value' => intval($row['value']),
+            'value' => $isRevealed ? intval($row['value']) : 0,
             'owner' => $row['owner']
         );
     }

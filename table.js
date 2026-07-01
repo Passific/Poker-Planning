@@ -164,21 +164,54 @@ function do_reveal()
         results[el.dataset.id] || (results[el.dataset.id] = 0);
         results[el.dataset.id]++;
     });
-    results.forEach((value, i) => {
-        const el2 = document.getElementById("card-" + i);
-        if (el2) {
-            const card = el2.cloneNode(true);
-            card.id = "card-result-" + i;
-            card.classList.remove("poker-card-flip", "poker-card-select", "selected");
-            card.classList.add("poker-card-result");
-            const newLabel = document.createElement("span");
-            newLabel.classList.add("owner");
-            newLabel.textContent = value;
-            card.appendChild(newLabel);
-            resultEl.appendChild(card);
-            resultEl.style.display = "block";
+    const maxVotes = results.reduce((max, value) => {
+        return Math.max(max, value || 0);
+    }, 0);
+    let firstVoted = -1;
+    let lastVoted = -1;
+    for (let i = 1; i < results.length; i++) {
+        if ((results[i] || 0) > 0) {
+            if (-1 === firstVoted) {
+                firstVoted = i;
+            }
+            lastVoted = i;
         }
-    });
+    }
+
+    if (-1 !== firstVoted) {
+        let previousWasSpacer = false;
+        for (let i = firstVoted; i <= lastVoted; i++) {
+            const value = results[i] || 0;
+            if (0 === value) {
+                if (!previousWasSpacer) {
+                    const spacer = document.createElement("div");
+                    spacer.classList.add("poker-card-spacer", "poker-card-spacer-reveal");
+                    resultEl.appendChild(spacer);
+                    previousWasSpacer = true;
+                }
+                continue;
+            }
+
+            const el2 = document.getElementById("card-" + i);
+            if (el2) {
+                const card = el2.cloneNode(true);
+                card.id = "card-result-" + i;
+                card.classList.remove("poker-card-flip", "poker-card-select", "selected");
+                card.classList.add("poker-card-result");
+                if (maxVotes > 1) {
+                    const scale = 0.92 + (0.26 * value / maxVotes);
+                    card.style.setProperty("--result-scale", scale.toFixed(2));
+                }
+                const newLabel = document.createElement("span");
+                newLabel.classList.add("owner");
+                newLabel.textContent = value;
+                card.appendChild(newLabel);
+                resultEl.appendChild(card);
+                resultEl.style.display = "block";
+                previousWasSpacer = false;
+            }
+        }
+    }
 }
 
 function do_select_card()
@@ -318,7 +351,6 @@ function applyServerTableState(get)
     let isPokerStarted = false;
     const isAnonymous = get.anonymous;
     anonymousEl.checked = isAnonymous;
-    reviewEl.innerHTML = "";
     const newTableStatus = get.status;
     let hasTableChanged = false;
 
@@ -344,32 +376,40 @@ function applyServerTableState(get)
     if (hasTableChanged) {
         set_table();
     }
+    reviewEl.innerHTML = "";
+    const availableTemplates = Array.from(selectEl.querySelectorAll(".poker-card"));
 
     get.data.forEach((val) => {
-        if (val.value) {
-            const el = document.getElementById("card-" + val.value);
-            if (el) {
-                if (val.owner === userName && "select" === state) {
-                    select_card(String(val.value));
-                }
-                const card = el.cloneNode(true);
-                card.id = "card-review-" + val.value;
-                card.classList.remove("poker-card-select", "selected");
-                if ("reveal" !== state) {
-                    card.classList.add("poker-card-flip");
-                }
-                else {
-                    card.classList.remove("poker-card-flip");
-                }
-                if (!isAnonymous) {
-                    const newLabel = document.createElement("span");
-                    newLabel.classList.add("owner");
-                    newLabel.textContent = val.owner;
-                    card.appendChild(newLabel);
-                }
-                reviewEl.appendChild(card);
-                isPokerStarted = true;
+        const showRealCard = ("1" === newTableStatus && val.value);
+        const randomTemplate = (availableTemplates.length > 0)
+            ? availableTemplates[Math.floor(Math.random() * availableTemplates.length)]
+            : null;
+        const templateCard = showRealCard
+            ? document.getElementById("card-" + val.value)
+            : randomTemplate;
+
+        if (templateCard) {
+            if (showRealCard && val.owner === userName && "select" === state) {
+                select_card(String(val.value));
             }
+
+            const card = templateCard.cloneNode(true);
+            card.id = "card-review-" + (showRealCard ? val.value : (val.id || "hidden"));
+            card.classList.remove("poker-card-select", "selected");
+            if (showRealCard && "reveal" === state) {
+                card.classList.remove("poker-card-flip");
+            }
+            else {
+                card.classList.add("poker-card-flip");
+            }
+            if (!isAnonymous) {
+                const newLabel = document.createElement("span");
+                newLabel.classList.add("owner");
+                newLabel.textContent = val.owner;
+                card.appendChild(newLabel);
+            }
+            reviewEl.appendChild(card);
+            isPokerStarted = true;
         }
     });
 
