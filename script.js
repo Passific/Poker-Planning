@@ -20,6 +20,7 @@ let lastCheckedRoom = "";
 let lastRoomExists = null;
 let requestSequence = 0;
 let isRoomLocked = false;
+let csrfToken = "";
 
 function apiFetch(url)
 {
@@ -28,6 +29,43 @@ function apiFetch(url)
             return Promise.reject(new Error("apiFetch " + url + " response.status=" + response.status));
         }
         return response.json();
+    });
+}
+
+function apiPostFetch(action, params = {})
+{
+    const formData = new FormData();
+    formData.append("a", action);
+    formData.append("csrf", csrfToken);
+    for (const [key, value] of Object.entries(params)) {
+        formData.append(key, value);
+    }
+
+    return fetch("api.php", {
+        method: "POST",
+        body: formData
+    }).then((response) => {
+        if (200 !== response.status) {
+            return Promise.reject(new Error("apiPostFetch " + action + " response.status=" + response.status));
+        }
+        return response.json();
+    }).then((data) => {
+        if (data.csrf) {
+            csrfToken = data.csrf;
+        }
+        return data;
+    });
+}
+
+function initializeCsrfToken()
+{
+    return apiFetch("get_token").then((result) => {
+        if (result.csrf) {
+            csrfToken = result.csrf;
+        }
+        return result;
+    }).catch(() => {
+        console.error("Failed to fetch CSRF token");
     });
 }
 
@@ -228,7 +266,7 @@ function joinOrCreateRoom()
     setButtonState("Creating...", true, "create");
     setStatus("Creating room.");
 
-    apiFetch("create_room&room=" + encodeURIComponent(form.room)).then((result) => {
+    apiPostFetch("create_room", { room: form.room }).then((result) => {
         if (result.result && result.room) {
             goToRoom(result.room);
             return;
@@ -290,6 +328,11 @@ const roomCode = JSON.parse(localStorage.getItem("roomCode"));
 if (null !== roomCode && "" !== roomCode) {
     roomInputEl.value = roomCode;
 }
+
+/* Initialize CSRF token */
+initializeCsrfToken().then(() => {
+    updateUiState();
+});
 
 const roomParam = sanitizeRoom(getParameterByName("room"));
 if ("" !== roomParam) {

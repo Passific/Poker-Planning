@@ -1,5 +1,11 @@
 :root {color-scheme: light dark;}
 
+#action-error {
+  min-height: 1.2em;
+  color: #c0392b;
+  font-size: 0.9rem;
+}
+
 @media (prefers-color-scheme: dark) {
   fieldset { border-color: #808080 }
 }

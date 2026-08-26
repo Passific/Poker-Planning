@@ -11,12 +11,17 @@ const THRESHOLD_IN_FOCUS = 1;
 const THRESHOLD_OUT_FOCUS = 3;
 const THRESHOLD_NOT_VISIBLE = 30;
 const DEFAULT_TIMEOUT = 60;
+const REQUEST_TIMEOUT_MS = 10000;
 
 const SPACER_CARD = "!spacer!";
 const CARD_SUITES = {
     "fibonacci2": [0, 1, 2, 3, 5, 8, 13, 20, 40, 100, SPACER_CARD, "coffee", "infinite", "question"],
     "confidence": [1, 2, 3, 4, 5],
-    "scale": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    "scale": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "tshirt": [1, 2, 3, 4, SPACER_CARD, SPACER_CARD, 5, 6]
+};
+const CARD_LABELS = {
+    "tshirt": ["xs", "s", "m", "l", SPACER_CARD, SPACER_CARD, "xl", "xxl"]
 };
 const DEFAULT_SUITE = "fibonacci2";
 
@@ -40,18 +45,81 @@ const countdownEl = document.getElementById("countdown");
 const roomCodeEl = document.getElementById("room-code");
 const copyLinkBtnEl = document.getElementById("copy-link");
 const participantsListEl = document.getElementById("participants-list");
+const actionErrorEl = document.getElementById("action-error");
 
 let timerCountdown = null;
 let timeOutSelect = false;
 let pollSequence = 0;
+let csrfToken = "";
+let pollInProgress = false;
+
+function show_action_error(message)
+{
+    if (actionErrorEl) {
+        actionErrorEl.textContent = message;
+    }
+}
+
+function fetch_with_timeout(url, options = {})
+{
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => {
+        clearTimeout(timeoutId);
+    });
+}
 
 function api_fetch(url)
 {
-    return fetch(API_URL + url).then((response) => {
+    return fetch_with_timeout(API_URL + url).then((response) => {
         if (200 !== response.status) {
             return Promise.reject(new Error("api_fetch " + url + " response.status=" + response.status));
         }
         return response.json();
+    });
+}
+
+function api_post_fetch(action, params = {})
+{
+    const formData = new FormData();
+    formData.append("a", action);
+    formData.append("csrf", csrfToken);
+    formData.append("room", roomCode);
+    for (const [key, value] of Object.entries(params)) {
+        formData.append(key, value);
+    }
+
+    return fetch_with_timeout("api.php", {
+        method: "POST",
+        body: formData
+    }).then((response) => {
+        if (200 !== response.status) {
+            return Promise.reject(new Error("api_post_fetch " + action + " response.status=" + response.status));
+        }
+        return response.json();
+    }).then((data) => {
+        if (data.csrf) {
+            csrfToken = data.csrf;
+        }
+        if (!data.result) {
+            show_action_error("Action failed: " + (data.error || "request_failed"));
+        }
+        return data;
+    }).catch((error) => {
+        show_action_error("Action failed: " + ("AbortError" === error.name ? "request_timeout" : "request_failed"));
+        throw error;
+    });
+}
+
+function initialize_csrf_token()
+{
+    return api_fetch("get_token").then((result) => {
+        if (result.csrf) {
+            csrfToken = result.csrf;
+        }
+        return result;
+    }).catch(() => {
+        console.error("Failed to fetch CSRF token");
     });
 }
 
@@ -75,7 +143,7 @@ function countDown(time)
 
 function ask_timeout()
 {
-    return api_fetch("timeout&room=" + encodeURIComponent(roomCode) + "&v=" + this.value);
+    return api_post_fetch("timeout", { v: this.value });
 }
 
 function stopCountDown()
@@ -219,7 +287,7 @@ function do_select_card()
     if ("select" === state || "update" === state) {
         const id = this.dataset.id;
         select_card(id);
-        return api_fetch("select&room=" + encodeURIComponent(roomCode) + "&v=" + id + "&p=" + encodeURIComponent(userName));
+        return api_post_fetch("select", { v: id, p: userName });
     }
 }
 
@@ -249,22 +317,22 @@ function select_card(id)
 
 function ask_reset()
 {
-    return api_fetch("reset&room=" + encodeURIComponent(roomCode));
+    return api_post_fetch("reset", {});
 }
 
 function ask_reveal()
 {
-    return api_fetch("reveal&room=" + encodeURIComponent(roomCode));
+    return api_post_fetch("reveal", {});
 }
 
 function ask_change_suite()
 {
-    return api_fetch("suite&p=" + encodeURIComponent(this.value) + "&room=" + encodeURIComponent(roomCode));
+    return api_post_fetch("suite", { p: this.value });
 }
 
 function ask_anonymous()
 {
-    return api_fetch("anonymous&v=" + (this.checked ? 1 : 0) + "&room=" + encodeURIComponent(roomCode));
+    return api_post_fetch("anonymous", { v: (this.checked ? 1 : 0) });
 }
 
 function renderParticipants(participants)
@@ -443,8 +511,12 @@ function applyServerTableState(get)
 const EMPTY_DATE = "0000-00-00 00:00:00";
 function update_table()
 {
+    if (pollInProgress) {
+        return Promise.resolve();
+    }
     if (counter >= threshold) {
         counter = 0;
+        pollInProgress = true;
         const seq = ++pollSequence;
         const url = "get&room=" + encodeURIComponent(roomCode) + "&since=" + latestVersion + "&p=" + encodeURIComponent(userName);
         return api_fetch(url).then((get) => {
@@ -455,6 +527,8 @@ function update_table()
                 latestVersion = get.version;
             }
             applyServerTableState(get);
+        }).finally(() => {
+            pollInProgress = false;
         });
     }
 
@@ -513,10 +587,13 @@ function set_table()
     for (const Nb in CARD_SUITES[suiteName]) {
         const cardNb = CARD_SUITES[suiteName][Nb];
         if (SPACER_CARD !== cardNb) {
+            const cardLabel = CARD_LABELS[suiteName] ? CARD_LABELS[suiteName][Nb] : cardNb;
+            const cardTheme = CARD_LABELS[suiteName] ? "basic" : theme;
+            const cardExtension = CARD_LABELS[suiteName] ? "svg" : theme_ext;
             const card_back = document.createElement("div");
             card_back.classList.add("poker-card-back");
             const back_img = document.createElement("img");
-            back_img.setAttribute("src", "cards/" + theme + "/back." + theme_ext);
+            back_img.setAttribute("src", "cards/" + cardTheme + "/back." + cardExtension);
             back_img.setAttribute("alt", "PP");
             card_back.appendChild(back_img);
 
@@ -526,9 +603,9 @@ function set_table()
             const card_front = document.createElement("div");
             card_front.classList.add("poker-card-front");
             const card_front_img = document.createElement("img");
-            card_front_img.setAttribute("src", "cards/" + theme + "/" + cardNb + "." + theme_ext);
+            card_front_img.setAttribute("src", "cards/" + cardTheme + "/" + (CARD_LABELS[suiteName] ? cardLabel : cardNb) + "." + cardExtension);
             card_front.appendChild(card_front_img);
-            card_front.setAttribute("alt", cardNb);
+            card_front.setAttribute("alt", cardLabel);
             card_inner.appendChild(card_front);
             card_inner.appendChild(card_back);
 
@@ -589,26 +666,28 @@ if (
     && null !== roomCode
     && "" !== roomCode
 ) {
-    resetBtnEl.disabled = true;
-    revealBtnEl.disabled = true;
-    selectSuiteEl.disabled = false;
-    anonymousEl.disabled = false;
+    initialize_csrf_token().then(() => {
+        resetBtnEl.disabled = true;
+        revealBtnEl.disabled = true;
+        selectSuiteEl.disabled = false;
+        anonymousEl.disabled = false;
 
-    resetBtnEl.addEventListener("click", ask_reset);
-    revealBtnEl.addEventListener("click", ask_reveal);
-    selectSuiteEl.addEventListener("change", ask_change_suite);
-    anonymousEl.addEventListener("change", ask_anonymous);
-    copyLinkBtnEl.addEventListener("click", copyCurrentLink);
+        resetBtnEl.addEventListener("click", ask_reset);
+        revealBtnEl.addEventListener("click", ask_reveal);
+        selectSuiteEl.addEventListener("change", ask_change_suite);
+        anonymousEl.addEventListener("change", ask_anonymous);
+        copyLinkBtnEl.addEventListener("click", copyCurrentLink);
 
-    roomCodeEl.textContent = roomCode;
-    nameEl.textContent = userName;
-    suiteName = getParameterByName("suite") || DEFAULT_SUITE;
+        roomCodeEl.textContent = roomCode;
+        nameEl.textContent = userName;
+        suiteName = getParameterByName("suite") || DEFAULT_SUITE;
 
-    localStorage.setItem("roomCode", JSON.stringify(roomCode));
+        localStorage.setItem("roomCode", JSON.stringify(roomCode));
 
-    state = "select";
-    set_table();
-    startTable();
+        state = "select";
+        set_table();
+        startTable();
+    });
 }
 else {
     window.location.href = "index.html" + ("" !== roomCode ? "?room=" + encodeURIComponent(roomCode) : "");

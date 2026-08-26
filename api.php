@@ -2,17 +2,24 @@
 include("config.php");
 include("config.bdd.php");
 
+session_start();
+
 date_default_timezone_set("Europe/Paris");
 header("Server: Passific");
 header("X-Powered-By: Passific");
 header("Content-Type: application/json; charset=utf-8");
 header("X-Content-Type-Options: nosniff");
 header("Cache-Control: no-store");
+header("X-Frame-Options: DENY");
+header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'");
 
 const DEFAULT_TIMEOUT = 60;
 const DEFAULT_SUITE = "fibonacci2";
 const EMPTY_DATE = "0000-00-00 00:00:00";
 const PRESENCE_TTL_SECONDS = 120;
+const RATE_LIMIT_REQUESTS = 180;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 $pdo = null;
 
@@ -20,6 +27,45 @@ function send_json($payload)
 {
     echo json_encode($payload);
     exit;
+}
+
+function get_csrf_token()
+{
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function validate_csrf_token($token)
+{
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function check_rate_limit()
+{
+    $client_ip = $_SERVER['REMOTE_ADDR'];
+    $rate_limit_key = 'rate_limit_' . $client_ip;
+
+    if (!isset($_SESSION[$rate_limit_key])) {
+        $_SESSION[$rate_limit_key] = array();
+    }
+
+    $now = time();
+    $requests = $_SESSION[$rate_limit_key];
+
+    /* Remove old requests outside the window */
+    $requests = array_filter($requests, function($timestamp) use ($now) {
+        return ($now - $timestamp) < RATE_LIMIT_WINDOW_SECONDS;
+    });
+
+    if (count($requests) >= RATE_LIMIT_REQUESTS) {
+        return false;
+    }
+
+    $requests[] = $now;
+    $_SESSION[$rate_limit_key] = $requests;
+    return true;
 }
 
 function get_pdo()
@@ -213,7 +259,7 @@ function get_table_state($roomCode, $sinceVersion, $owner)
     /* Keep presence table compact over time (~1% of requests) */
     if (mt_rand(0, 99) === 0) {
         exec_stmt(
-            "DELETE FROM `".$site_bdd_prefix."presence` WHERE `last_seen` < (NOW() - INTERVAL 7 DAY)"
+            "DELETE FROM `".$site_bdd_prefix."presence` WHERE `last_seen` < (NOW() - INTERVAL 60 DAY)"
         );
     }
 
@@ -269,15 +315,30 @@ function get_table_state($roomCode, $sinceVersion, $owner)
 }
 
 try {
-    $action = isset($_GET['a']) ? $_GET['a'] : "";
-    $owner = sanitize_owner(isset($_GET['p']) ? $_GET['p'] : "");
-    $value = isset($_GET['v']) ? intval($_GET['v']) : 0;
-    $room = sanitize_room(isset($_GET['room']) ? $_GET['room'] : "");
-    $since = isset($_GET['since']) ? intval($_GET['since']) : -1;
+    /* Rate limit check */
+    if (!check_rate_limit()) {
+        send_json(array('result' => false, 'error' => 'rate_limit_exceeded'));
+    }
+
+    $action = isset($_POST['a']) ? $_POST['a'] : (isset($_GET['a']) ? $_GET['a'] : "");
+    $owner = sanitize_owner(isset($_POST['p']) ? $_POST['p'] : (isset($_GET['p']) ? $_GET['p'] : ""));
+    $value = isset($_POST['v']) ? intval($_POST['v']) : (isset($_GET['v']) ? intval($_GET['v']) : 0);
+    $room = sanitize_room(isset($_POST['room']) ? $_POST['room'] : (isset($_GET['room']) ? $_GET['room'] : ""));
+    $since = isset($_POST['since']) ? intval($_POST['since']) : (isset($_GET['since']) ? intval($_GET['since']) : -1);
+    $csrf_token = isset($_POST['csrf']) ? $_POST['csrf'] : (isset($_GET['csrf']) ? $_GET['csrf'] : "");
 
     switch ($action) {
+        case 'get_token': {
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
+            break;
+        }
+
         case 'create_room': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             $result = create_room($room);
+            $result['csrf'] = get_csrf_token();
             send_json($result);
             break;
         }
@@ -300,6 +361,9 @@ try {
 
         case 'select':
         case 'update': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             if ("" === $room || "" === $owner || $value <= 0 || $value > 200) {
                 send_json(array('result' => false, 'error' => 'invalid_input'));
             }
@@ -317,11 +381,14 @@ try {
             );
 
             table_touch_update($room, "`status`=0, `date`=IF(`date` IS NULL, NOW(), `date`)", array());
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
         case 'reset': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             if ("" === $room) {
                 send_json(array('result' => false, 'error' => 'missing_room'));
             }
@@ -333,29 +400,38 @@ try {
 
             exec_stmt("DELETE FROM `".$site_bdd_prefix."cards` WHERE `room_id`=:room_id", array(':room_id' => $roomId));
             table_touch_update($room, "`status`=2, `date`=NULL", array());
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
         case 'reveal': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             if ("" === $room) {
                 send_json(array('result' => false, 'error' => 'missing_room'));
             }
             table_touch_update($room, "`status`=1, `date`=NULL", array());
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
         case 'timeout': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             if ("" === $room || $value <= 0 || $value > 3600) {
                 send_json(array('result' => false, 'error' => 'invalid_input'));
             }
             table_touch_update($room, "`timeout`=:timeout, `date`=NULL", array(':timeout' => $value));
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
         case 'suite': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             $suite = sanitize_room($owner);
             if ("" === $room || "" === $suite) {
                 send_json(array('result' => false, 'error' => 'invalid_input'));
@@ -369,11 +445,14 @@ try {
                 table_touch_update($room, "`status`=2, `date`=NULL", array());
             }
 
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
         case 'anonymous': {
+            if ('POST' !== $_SERVER['REQUEST_METHOD'] || !validate_csrf_token($csrf_token)) {
+                send_json(array('result' => false, 'error' => 'invalid_request'));
+            }
             if ("" === $room) {
                 send_json(array('result' => false, 'error' => 'missing_room'));
             }
@@ -385,7 +464,7 @@ try {
                 table_touch_update($room, "`status`=2, `date`=NULL", array());
             }
 
-            send_json(array('result' => true));
+            send_json(array('result' => true, 'csrf' => get_csrf_token()));
             break;
         }
 
